@@ -164,8 +164,21 @@ void DCMI_init() {
     DCMI->CR |= (DCMI_CR_CM | DCMI_CR_VSPOL | DCMI_CR_HSPOL | DCMI_CR_PCKPOL | DCMI_CR_ENABLE);
 }
 //===========================================================================================================
-void MCO1_init() {
+#define GPIO_AF_MCO    0x00UL
 
+void MCO1_init() {
+    //enable clock for GPIOA
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+	
+    //PA8 -> MCO(AF) -> PLLCLK
+    GPIOA->MODER |= GPIO_MODER_MODER8_1; //AF
+    GPIOA->OTYPER &= ~GPIO_OTYPER_OT_8; //PP
+    GPIOA->PUPDR |= GPIO_PUPDR_PUPDR8_0; //PU
+    GPIOA->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR8; //High speed
+
+    //AF0->MCO
+    GPIOA->AFR[1] |= (GPIO_AF_MCO << GPIO_AFRH_AFSEL0_Pos);
+    RCC->CFGR &= ~RCC_CFGR_MCO1; //HSI
 }
 
 //===========================================================================================================
