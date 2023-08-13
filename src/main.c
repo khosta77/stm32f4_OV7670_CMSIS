@@ -1,5 +1,6 @@
 #include "../system/include/cmsis/stm32f4xx.h"
 
+//===========================================================================================================
 void I2C2_init() {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
     GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR10 | GPIO_OSPEEDER_OSPEEDR11;
@@ -87,47 +88,87 @@ uint8_t I2C2_read_byte(uint8_t address, uint8_t code) {
     I2C2->CR1 &= ~I2C_CR1_ACK;
 	return data;
 }
-
-void DMCI_init() {
-    //// GPIO
-    // GPIOA
+//===========================================================================================================
+void DCMI_init() {
+    /* GPIO */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
-    GPIOA->MODER |= (GPIO_MODER_MODER4_1 |
-                     GPIO_MODER_MODER6_1 |
-                     GPIO_MODER_MODER9_1 |
-                     GPIO_MODER_MODER10_1);
-    GPIOA->OSPEED |= ((GPIO_OSPEEDER_OSPEEDR4_1 | GPIO_OSPEEDER_OSPEEDR4_0) | 
-                      (GPIO_OSPEEDER_OSPEEDR6_1 | GPIO_OSPEEDER_OSPEEDR6_0) |
-                      (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0) |
-                      (GPIO_OSPEEDER_OSPEEDR10_1 | GPIO_OSPEEDER_OSPEEDR10_0));
-    GPIOA->AFR[0] |= ((0xD << 16) | (0xD << 24));
-    GPIOA->AFR[1] |= ((0xD << 4) | (0xD << 8));
-
-    // GPIOB
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-    GPIOB->MODER |= (GPIO_MODER_MODER6_1 |
-                     GPIO_MODER_MODER7_1 |
-                     GPIO_MODER_MODER8_1 |
-                     GPIO_MODER_MODER9_1);
-    GPIOB->OSPEED |= ((GPIO_OSPEEDER_OSPEEDR6_1 | GPIO_OSPEEDER_OSPEEDR6_0) | 
-                      (GPIO_OSPEEDER_OSPEEDR7_1 | GPIO_OSPEEDER_OSPEEDR7_0) |
-                      (GPIO_OSPEEDER_OSPEEDR8_1 | GPIO_OSPEEDER_OSPEEDR8_0) |
-                      (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0));
-    GPIOB->AFR[0] |= ((0xD << 24) | (0xD << 28));
-    GPIOB->AFR[1] |= ((0xD << 0) | (0xD << 4));
-
-    // GPIOC
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
-    GPIOC->MODER |= (GPIO_MODER_MODER8_1 |
-                     GPIO_MODER_MODER9_1 |
-                     GPIO_MODER_MODER11_1);
-    GPIOC->OSPEED |= ((GPIO_OSPEEDER_OSPEEDR8_1 | GPIO_OSPEEDER_OSPEEDR8_0) |
-                      (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0) |
-                      (GPIO_OSPEEDER_OSPEEDR11_1 | GPIO_OSPEEDER_OSPEEDR11_0));
-    GPIOC->AFR[1] |= ((0xD << 0) | (0xD << 4) | (0xD << 12));
 
+    // VSY | VSYNC
+    GPIOB->MODER |= GPIO_MODER_MODER7_1;
+    GPIOB->OSPEED |= (GPIO_OSPEEDER_OSPEEDR7_1 | GPIO_OSPEEDER_OSPEEDR7_0);
+    GPIOB->PUPDR |= GPIO_PUPDR_PUPDR7_0;
+    GPIOB->AFR[0] |= (0xD << 28);
+
+    // HRE | HSYNC
+    GPIOA->MODER |= GPIO_MODER_MODER4_1;
+    GPIOA->OSPEED |= (GPIO_OSPEEDER_OSPEEDR4_1 | GPIO_OSPEEDER_OSPEEDR4_0);
+    GPIOA->PUPDR |= GPIO_PUPDR_PUPDR4_0;
+    GPIOA->AFR[0] |= (0xD << 16);
     
+    // PCLK
+    GPIOA->MODER |= GPIO_MODER_MODER6_1;
+    GPIOA->OSPEED |= (GPIO_OSPEEDER_OSPEEDR6_1 | GPIO_OSPEEDER_OSPEEDR6_0);
+    GPIOA->AFR[0] |= (0xD << 24);
+
+    // D0
+    GPIOA->MODER |= GPIO_MODER_MODER9_1;
+    GPIOA->OSPEED |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
+    GPIOA->PUPDR |= GPIO_PUPDR_PUPDR9_0;
+    GPIOA->AFR[1] |= (0xD << 4);
+
+    // D1
+    GPIOA->MODER |= GPIO_MODER_MODER10_1;
+    GPIOA->OSPEED |= (GPIO_OSPEEDER_OSPEEDR10_1 | GPIO_OSPEEDER_OSPEEDR10_0);
+    GPIOA->PUPDR |= GPIO_PUPDR_PUPDR10_0;
+    GPIOA->AFR[1] |= (0xD << 8);
+
+    // D2
+    GPIOC->MODER |= GPIO_MODER_MODER8_1;
+    GPIOC->OSPEED |= (GPIO_OSPEEDER_OSPEEDR8_1 | GPIO_OSPEEDER_OSPEEDR8_0);
+    GPIOC->PUPDR |= GPIO_PUPDR_PUPDR8_0;
+    GPIOC->AFR[1] |= (0xD << 0);
+
+    // D3
+    GPIOC->MODER |= GPIO_MODER_MODER9_1;
+    GPIOC->OSPEED |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
+    GPIOC->PUPDR |= GPIO_PUPDR_PUPDR9_0;
+    GPIOC->AFR[1] |= (0xD << 4);
+
+    // D4
+    GPIOC->MODER |= GPIO_MODER_MODER11_1;
+    GPIOC->OSPEED |= (GPIO_OSPEEDER_OSPEEDR11_1 | GPIO_OSPEEDER_OSPEEDR11_0);
+    GPIOC->PUPDR |= GPIO_PUPDR_PUPDR11_0;
+    GPIOC->AFR[1] |= (0xD << 12);
+
+    // D5
+    GPIOB->MODER |= GPIO_MODER_MODER6_1;
+    GPIOB->OSPEED |= (GPIO_OSPEEDER_OSPEEDR6_1 | GPIO_OSPEEDER_OSPEEDR6_0);
+    GPIOB->PUPDR |= GPIO_PUPDR_PUPDR6_0;
+    GPIOB->AFR[0] |= (0xD << 24);
+
+    // D6
+    GPIOB->MODER |= GPIO_MODER_MODER8_1;
+    GPIOB->OSPEED |= (GPIO_OSPEEDER_OSPEEDR8_1 | GPIO_OSPEEDER_OSPEEDR8_0);
+    GPIOB->PUPDR |= GPIO_PUPDR_PUPDR8_0;
+    GPIOB->AFR[1] |= (0xD << 0);
+
+    // D7
+    GPIOB->MODER |= GPIO_MODER_MODER9_1;
+    GPIOB->OSPEED |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
+    GPIOB->PUPDR |= GPIO_PUPDR_PUPDR9_0;
+    GPIOB->AFR[1] |= (0xD << 4);
+
+    /* DCMI */
+    DCMI->CR |= (DCMI_CR_CM | DCMI_CR_VSPOL | DCMI_CR_HSPOL | DCMI_CR_PCKPOL | DCMI_CR_ENABLE);
 }
+//===========================================================================================================
+void MCO1_init() {
+
+}
+
+//===========================================================================================================
 
 int main(void) {
     I2C2_init();
