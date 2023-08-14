@@ -11,6 +11,8 @@
 #define IMG_ROWS            144
 #define IMG_COLUMNS   		174
 
+uint8_t temp_buffer[IMG_ROWS * IMG_COLUMNS];
+
 const uint8_t OV7670_reg[OV7670_REG_NUM][2] = { 
     { 0x12, 0x80 },
 // Image format
@@ -214,6 +216,32 @@ int OV7670_init() {
 	return err;
 }
 //===========================================================================================================
+void DMA2_Stream4_IRQHandler(void) {
+	if((DMA2->HISR & (DMA_HISR_TCIF4 | DMA_HISR_HTIF4)) == (DMA_HISR_TCIF4 | DMA_HISR_HTIF4)) {
+        // Очищаем регистры отвечающие за прерывание.
+		DMA2->HIFCR = (DMA_HIFCR_CTCIF4 | DMA_HIFCR_CHTIF4);
+	} 
+}
+
+void DCMI_IRQHandler(void) {
+	if (DCMI_GetFlagStatus(DCMI_FLAG_FRAMERI) == SET) { // Frame received
+		DCMI_ClearFlag(DCMI_FLAG_FRAMERI);
+		// After receiving a full frame we disable capture and the DMA transfer. This is probably a very inefficient way of capturing and sending frames
+		// but it's the only way I've gotten to reliably work.
+		DMA_Cmd(DMA2_Stream1, DISABLE);
+		DCMI_Cmd(DISABLE);
+		DCMI_CaptureCmd(DISABLE);
+	}
+	if (DCMI_GetFlagStatus(DCMI_FLAG_OVFRI) == SET) { // Overflow
+		// Not used, just for debug
+		DCMI_ClearFlag(DCMI_FLAG_OVFRI);
+	}
+	if (DCMI_GetFlagStatus(DCMI_FLAG_ERRRI) == SET) { // Error
+		// Not used, just for debug
+		DCMI_ClearFlag(DCMI_FLAG_ERRRI);
+	}
+}
+
 void DCMI_init() {
     /* GPIO */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
@@ -285,7 +313,35 @@ void DCMI_init() {
     GPIOB->PUPDR |= GPIO_PUPDR_PUPDR9_0;
     GPIOB->AFR[1] |= (0xD << 4);
 
+    /* DMA */
+    RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN;
+    DMA2_Stream1->CR |= (0x1 << 25);
+    
+	DMA2_Stream1->PAR |= (uint32_t) (&DCMI->DR);
+	DMA2_Stream1->M0AR |= (uint32_t)&temp_buffer;
+	DMA2_Stream1->NDTR = (IMG_ROWS * IMG_COLUMNS) / 4;
+
+    // 3. Настройка
+    // 3.1 DMA_SxCR_CIRC - Включаем круговой режим работы
+    // 3.2 DMA_SxCR_MINC - Режим увеличения объема памяти
+    // 3.3 DMA_SxCR_PSIZE_1 - Длина 32-bit
+    // 3.4 DMA_SxCR_MSIZE_1 - Длина 32-bit
+    // 3.5 DMA_SxCR_PL_1 - Высокий уровень приоритета, не обезательная скорее всего настройка, 
+    //                     добавить если несколько будеь
+    // 3.6 DMA_SxCR_TCIE - Прерывания
+    DMA2_Stream1->CR = (/*DMA_SxCR_CIRC |*/ DMA_SxCR_MINC | DMA_SxCR_PSIZE_1 | DMA_SxCR_MSIZE_1 | DMA_SxCR_TCIE | DMA_SxCR_TEIE);
+    DMA2_Stream1->FCR |= (0x3 << 0 );
+    // 4. Прерывания
+    NVIC_EnableIRQ(DMA2_Stream1_IRQn);
+    NVIC_SetPriority(DMA2_Stream1_IRQn, 0);
+
+    // 5. Запуск
+	DMA2_Stream1->CR |= DMA_SxCR_EN;
+
     /* DCMI */
+    DCMI->ICR |= (DCMI_ICR_FRAME_ISC | DCMI_ICR_OVF_ISC | DCMI_ICR_ERR_ISC);
+    NVIC_EnableIRQ(DCMI_IRQn);
+    NVIC_SetPriority(DCMI_IRQn, 1);
     DCMI->CR |= (DCMI_CR_CM | DCMI_CR_VSPOL | DCMI_CR_HSPOL | DCMI_CR_PCKPOL | DCMI_CR_ENABLE);
 }
 //===========================================================================================================
@@ -305,7 +361,6 @@ void MCO1_init() {
     GPIOA->AFR[1] |= (GPIO_AF_MCO << GPIO_AFRH_AFSEL0_Pos);
     RCC->CFGR &= ~RCC_CFGR_MCO1; //HSI
 }
-
 //===========================================================================================================
 
 int main(void) {
