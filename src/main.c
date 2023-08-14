@@ -16,77 +16,44 @@ void I2C2_init() {
     I2C2->CR1 |= I2C_CR1_PE;
 }
 
-void I2C2_write_bytes(uint8_t addr, uint8_t *data, uint8_t len) {
-	while (I2C2->SR2 & I2C_SR2_BUSY);
-	I2C2->CR1 |= I2C_CR1_START;
-	while (!(I2C2->SR1 & I2C_SR1_SB));
-	I2C2->DR = (addr << 1);
-	while (!(I2C1->SR1 & I2C_SR1_ADDR));
-	(void) I2C2->SR2;
-	for (int i = 0; i < len; i++, *data++){
-		I2C2->DR = *data;
-		while (!(I2C2->SR1 & I2C_SR1_BTF));
-	}
-	I2C2->CR1 |= I2C_CR1_STOP;
-}
+#define SUCCESS 0
+#define ERROR -1
 
-void I2C2_write_code(uint8_t address, uint8_t code, uint8_t data) {
-	while (I2C2->SR2 & I2C_SR2_BUSY);
-	I2C2->CR1 |= I2C_CR1_START;
-	while (!(I2C2->SR1 & I2C_SR1_SB));
-	I2C2->DR = (address << 1);
-    while (!(I2C2->SR1 & I2C_SR1_ADDR));
-	(void) I2C2->SR2;
-	I2C2->DR = code;
-	while (!(I2C2->SR1 & I2C_SR1_TXE));
-	I2C2->DR = data;
-	while (!(I2C2->SR1 & I2C_SR1_TXE));
-	I2C2->CR1 |= I2C_CR1_STOP;
-}
+int SCCB_write_reg(uint8_t reg_addr, uint8_t* data) {
+	uint32_t timeout = 0x7FFFFF;
 
-void I2C2_write_byte(uint8_t address, uint8_t data) {
-	while (I2C2->SR2 & I2C_SR2_BUSY);
-	I2C2->CR1 |= I2C_CR1_START;
-	while (!(I2C2->SR1 & I2C_SR1_SB));
-	I2C2->DR = (address << 1);
-    while (!(I2C2->SR1 & I2C_SR1_ADDR));
-	(void) I2C2->SR2;
-	I2C2->DR = data;
-	while (!(I2C2->SR1 & I2C_SR1_TXE));
-	I2C2->CR1 |= I2C_CR1_STOP;
-}
+	while (I2C2->SR2 & I2C_SR2_BUSY)  // Тайм-аут занятости
+		if ((timeout--) == 0) return ERROR;
 
-void I2C2_read_bytes(uint8_t address, uint8_t *data, uint8_t size) {
-    while (I2C2->SR2 & I2C_SR2_BUSY);
+	// Send start bit
     I2C2->CR1 |= I2C_CR1_START;
-    while (!(I2C2->SR1 & I2C_SR1_SB));
-    I2C2->CR1 |= I2C_CR1_ACK;
-    I2C2->DR = ((address << 1) | 0x01);
-    while (!(I2C2->SR1 & I2C_SR1_ADDR))
-    (void) I2C2->SR2;
-    while (size--) {
-        while (!(I2C2->SR1 & I2C_SR1_RXNE));
-        *data++ = I2C2->DR;
-    }
-    I2C2->CR1 |= I2C_CR1_STOP;
-    I2C2->CR1 &=~ I2C_CR1_ACK;
-}
 
-uint8_t I2C2_read_byte(uint8_t address, uint8_t code) {
-    while (I2C2->SR2 & I2C_SR2_BUSY);
-	uint8_t data; // Возращаемые данные 
-    I2C2_write_byte(address, code);
-	I2C2->CR1 |= I2C_CR1_START;
-	while (!(I2C2->SR1 & I2C_SR1_SB));
-    I2C2->CR1 |= I2C_CR1_ACK;
-	I2C2->DR = ((address << 1) | 0x1);
-	while (!(I2C2->SR1 & I2C_SR1_ADDR));
-	(void) I2C2->SR2;
-	while (!(I2C2->SR1 & I2C_SR1_RXNE));
-	data = I2C2->DR;
+	while (!(I2C2->SR1 & I2C_SR1_SB))  // Тайм-аут начального бита
+		if ((timeout--) == 0) return ERROR;
+
+	// Send slave address (camera write address)
+	I2C2->DR = (OV7670_WRITE_ADDR << 1);
+	while (!(I2C2->SR1 & I2C_SR1_ADDR))  // Тайм-аут подчиненного адреса
+        if ((timeout--) == 0) return ERROR;
+    (void) I2C2->SR2;
+
+	// Send register address
+    I2C2->DR = reg_addr;
+	while (!(I2C2->SR1 & I2C_SR1_TXE))  // Время ожидания регистрации
+		if ((timeout--) == 0) return ERROR;
+	
+	// Send new register value
+    I2C2->DR = *(data + 0);
+	while (!(I2C2->SR1 & I2C_SR1_TXE))  // Значение тайм-аута
+		if ((timeout--) == 0) return ERROR;
+    
+    I2C2->DR = *(data + 1);
+	while (!(I2C2->SR1 & I2C_SR1_TXE))  // Значение тайм-аута
+		if ((timeout--) == 0) return ERROR;
+
+	// Send stop bit
 	I2C2->CR1 |= I2C_CR1_STOP;
-    I2C2->CR1 &= ~I2C_CR1_ACK;
-	return data;
+    return SUCCESS;
 }
 //===========================================================================================================
 void DCMI_init() {
