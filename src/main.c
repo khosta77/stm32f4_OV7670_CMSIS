@@ -167,7 +167,7 @@ void I2C2_init() {
 #define SUCCESS 0
 #define ERROR -1
 
-int SCCB_write_reg(uint8_t reg_addr, uint8_t* data) {
+int SCCB_write_reg(uint8_t reg_addr, uint8_t data) {
 	uint32_t timeout = 0x7FFFFF;
 
 	while (I2C2->SR2 & I2C_SR2_BUSY)  // Тайм-аут занятости
@@ -191,17 +191,27 @@ int SCCB_write_reg(uint8_t reg_addr, uint8_t* data) {
 		if ((timeout--) == 0) return ERROR;
 	
 	// Send new register value
-    I2C2->DR = *(data + 0);
+    I2C2->DR = data;
 	while (!(I2C2->SR1 & I2C_SR1_TXE))  // Значение тайм-аута
 		if ((timeout--) == 0) return ERROR;
     
-    I2C2->DR = *(data + 1);
-	while (!(I2C2->SR1 & I2C_SR1_TXE))  // Значение тайм-аута
-		if ((timeout--) == 0) return ERROR;
-
 	// Send stop bit
 	I2C2->CR1 |= I2C_CR1_STOP;
     return SUCCESS;
+}
+
+int OV7670_init() {
+	int err;
+
+	// Configure camera registers
+	for (uint8_t i = 0; i < OV7670_REG_NUM; i++) {
+		err = SCCB_write_reg(OV7670_reg[i][0], OV7670_reg[i][1]);
+		
+        if (err == ERROR) break;
+		Delay(0xFFFF);
+	}
+
+	return err;
 }
 //===========================================================================================================
 void DCMI_init() {
