@@ -12,6 +12,7 @@
 #define IMG_COLUMNS   		174
 
 uint8_t temp_buffer[IMG_ROWS * IMG_COLUMNS];
+int frame_flag = 0;
 
 const uint8_t OV7670_reg[OV7670_REG_NUM][2] = { 
     { 0x12, 0x80 },
@@ -216,30 +217,25 @@ int OV7670_init() {
 	return err;
 }
 //===========================================================================================================
-void DMA2_Stream4_IRQHandler(void) {
-	if((DMA2->HISR & (DMA_HISR_TCIF4 | DMA_HISR_HTIF4)) == (DMA_HISR_TCIF4 | DMA_HISR_HTIF4)) {
-        // Очищаем регистры отвечающие за прерывание.
-		DMA2->HIFCR = (DMA_HIFCR_CTCIF4 | DMA_HIFCR_CHTIF4);
-	} 
+void DMA2_Stream1_IRQHandler(void) {
+	if((DMA2->LISR & DMA_LISR_TCIF1) == DMA_LISR_TCIF1) {
+		DMA2->LIFCR = DMA_LIFCR_CTCIF1;
+	} else if ((DMA2->LISR & DMA_LISR_TEIF1) == DMA_LISR_TEIF1) {
+        DMA2->LIFCR = DMA_LIFCR_CTEIF1;
+    }
 }
 
 void DCMI_IRQHandler(void) {
-	if (DCMI_GetFlagStatus(DCMI_FLAG_FRAMERI) == SET) { // Frame received
-		DCMI_ClearFlag(DCMI_FLAG_FRAMERI);
-		// After receiving a full frame we disable capture and the DMA transfer. This is probably a very inefficient way of capturing and sending frames
-		// but it's the only way I've gotten to reliably work.
-		DMA_Cmd(DMA2_Stream1, DISABLE);
-		DCMI_Cmd(DISABLE);
-		DCMI_CaptureCmd(DISABLE);
-	}
-	if (DCMI_GetFlagStatus(DCMI_FLAG_OVFRI) == SET) { // Overflow
-		// Not used, just for debug
-		DCMI_ClearFlag(DCMI_FLAG_OVFRI);
-	}
-	if (DCMI_GetFlagStatus(DCMI_FLAG_ERRRI) == SET) { // Error
-		// Not used, just for debug
-		DCMI_ClearFlag(DCMI_FLAG_ERRRI);
-	}
+    if ((DCMI->RIS & DCMI_RIS_FRAME_RIS) == DCMI_RIS_FRAME_RIS) {
+        DCMI->ICR |= DCMI_ICR_FRAME_ISC;
+        // disable DMA
+    }
+    if ((DCMI->RIS & DCMI_RIS_OVR_RIS) == DCMI_RIS_OVR_RIS) {
+        //
+    }
+    if ((DCMI->RIS & DCMI_RIS_ERR_RIS) == DCMI_RIS_ERR_RIS) {
+
+    }
 }
 
 void DCMI_init() {
@@ -339,7 +335,7 @@ void DCMI_init() {
 	DMA2_Stream1->CR |= DMA_SxCR_EN;
 
     /* DCMI */
-    DCMI->ICR |= (DCMI_ICR_FRAME_ISC | DCMI_ICR_OVF_ISC | DCMI_ICR_ERR_ISC);
+    DCMI->IER |= (DCMI_IER_FRAME_IE | DCMI_IER_OVF_IE | DCMI_IER_ERR_IE);
     NVIC_EnableIRQ(DCMI_IRQn);
     NVIC_SetPriority(DCMI_IRQn, 1);
     DCMI->CR |= (DCMI_CR_CM | DCMI_CR_VSPOL | DCMI_CR_HSPOL | DCMI_CR_PCKPOL | DCMI_CR_ENABLE);
@@ -362,6 +358,39 @@ void MCO1_init() {
     RCC->CFGR &= ~RCC_CFGR_MCO1; //HSI
 }
 //===========================================================================================================
+
+void dumpFrame(void) {
+
+	uint8_t *buffer = (uint8_t *) frame_buffer;
+	int length = IMG_ROWS * IMG_COLUMNS * 2;
+	// Copy every other byte from the main frame buffer to our temporary buffer (this converts the image to grey scale)
+	int i;
+	for (i = 1; i < length; i += 2) {
+		temp_buffer[i / 2] = buffer[i];
+	}
+	// We only send the sync frame if it has been requested
+	if (send_sync_frame) {
+		for (i = 0x7f; i > 0; i--) {
+			uint8_t val = i;
+			Serial_sendb(&val);
+		}
+		send_sync_frame = false;
+	}
+
+	for (i = 0; i < (length / 2); i++) {
+		if (i > 100) {
+			Serial_sendb(&temp_buffer[i]);
+		} else {
+			uint8_t val = 0xff;
+			Serial_sendb(&val); // Change first 100 pixels to white to provide a reference for where the frame starts
+		}
+	}
+	// Enable capture and DMA after we have sent the photo. This is a workaround for the timing issues I've been having where
+	// the DMA transfer is not in sync with the frames being sent
+	DMA_Cmd(DMA2_Stream1, ENABLE);
+	DCMI_Cmd(ENABLE);
+	DCMI_CaptureCmd(ENABLE);
+}
 
 int main(void) {
     I2C2_init();
