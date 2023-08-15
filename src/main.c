@@ -145,7 +145,7 @@ const uint8_t OV7670_reg[OV7670_REG_NUM][2] = {
 	{ 0xb1, 0x0c },  //
     { 0xb2, 0x0e },  //
 	{ 0xb3, 0x82 },  //
-	{ 0x4b, 0x01 }, 
+	{ 0x4b, 0x01 } 
 };
 
 void Delay(uint32_t nCount) {
@@ -158,7 +158,7 @@ void I2C2_init() {
     GPIOB->MODER |= GPIO_MODER_MODER10_1 | GPIO_MODER_MODER11_1;
     GPIOB->OTYPER |= GPIO_OTYPER_OT_10 | GPIO_OTYPER_OT_11;
     GPIOB->PUPDR |= GPIO_PUPDR_PUPDR10_0 | GPIO_PUPDR_PUPDR11_0;
-    GPIOB->AFR[1] |= GPIO_AFRH_AFRH10_2 | GPIO_AFRH_AFRH11_2;
+    GPIOB->AFR[1] |= ((0x4 << 8) | (0x4 << 12));//GPIO_AFRH_AFRH10_2 | GPIO_AFRH_AFRH11_2;
 
     RCC->APB1ENR |= RCC_APB1ENR_I2C2EN ;
     I2C2->CR2 = 0x2A;
@@ -226,14 +226,14 @@ void DMA2_Stream1_IRQHandler(void) {
 }
 
 void DCMI_IRQHandler(void) {
-    if ((DCMI->RIS & DCMI_RIS_FRAME_RIS) == DCMI_RIS_FRAME_RIS) {
+    if ((DCMI->RISR & DCMI_RIS_FRAME_RIS) == DCMI_RIS_FRAME_RIS) {
         DCMI->ICR |= DCMI_ICR_FRAME_ISC;
         // disable DMA
     }
-    if ((DCMI->RIS & DCMI_RIS_OVR_RIS) == DCMI_RIS_OVR_RIS) {
+    if ((DCMI->RISR & DCMI_RIS_OVR_RIS) == DCMI_RIS_OVR_RIS) {
         //
     }
-    if ((DCMI->RIS & DCMI_RIS_ERR_RIS) == DCMI_RIS_ERR_RIS) {
+    if ((DCMI->RISR & DCMI_RIS_ERR_RIS) == DCMI_RIS_ERR_RIS) {
 
     }
 }
@@ -246,66 +246,66 @@ void DCMI_init() {
 
     // VSY | VSYNC
     GPIOB->MODER |= GPIO_MODER_MODER7_1;
-    GPIOB->OSPEED |= (GPIO_OSPEEDER_OSPEEDR7_1 | GPIO_OSPEEDER_OSPEEDR7_0);
+    GPIOB->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR7_1 | GPIO_OSPEEDER_OSPEEDR7_0);
     GPIOB->PUPDR |= GPIO_PUPDR_PUPDR7_0;
     GPIOB->AFR[0] |= (0xD << 28);
 
     // HRE | HSYNC
     GPIOA->MODER |= GPIO_MODER_MODER4_1;
-    GPIOA->OSPEED |= (GPIO_OSPEEDER_OSPEEDR4_1 | GPIO_OSPEEDER_OSPEEDR4_0);
+    GPIOA->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR4_1 | GPIO_OSPEEDER_OSPEEDR4_0);
     GPIOA->PUPDR |= GPIO_PUPDR_PUPDR4_0;
     GPIOA->AFR[0] |= (0xD << 16);
     
     // PCLK
     GPIOA->MODER |= GPIO_MODER_MODER6_1;
-    GPIOA->OSPEED |= (GPIO_OSPEEDER_OSPEEDR6_1 | GPIO_OSPEEDER_OSPEEDR6_0);
+    GPIOA->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR6_1 | GPIO_OSPEEDER_OSPEEDR6_0);
     GPIOA->AFR[0] |= (0xD << 24);
 
     // D0
     GPIOA->MODER |= GPIO_MODER_MODER9_1;
-    GPIOA->OSPEED |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
+    GPIOA->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
     GPIOA->PUPDR |= GPIO_PUPDR_PUPDR9_0;
     GPIOA->AFR[1] |= (0xD << 4);
 
     // D1
     GPIOA->MODER |= GPIO_MODER_MODER10_1;
-    GPIOA->OSPEED |= (GPIO_OSPEEDER_OSPEEDR10_1 | GPIO_OSPEEDER_OSPEEDR10_0);
+    GPIOA->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR10_1 | GPIO_OSPEEDER_OSPEEDR10_0);
     GPIOA->PUPDR |= GPIO_PUPDR_PUPDR10_0;
     GPIOA->AFR[1] |= (0xD << 8);
 
     // D2
     GPIOC->MODER |= GPIO_MODER_MODER8_1;
-    GPIOC->OSPEED |= (GPIO_OSPEEDER_OSPEEDR8_1 | GPIO_OSPEEDER_OSPEEDR8_0);
+    GPIOC->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR8_1 | GPIO_OSPEEDER_OSPEEDR8_0);
     GPIOC->PUPDR |= GPIO_PUPDR_PUPDR8_0;
     GPIOC->AFR[1] |= (0xD << 0);
 
     // D3
     GPIOC->MODER |= GPIO_MODER_MODER9_1;
-    GPIOC->OSPEED |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
+    GPIOC->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
     GPIOC->PUPDR |= GPIO_PUPDR_PUPDR9_0;
     GPIOC->AFR[1] |= (0xD << 4);
 
     // D4
     GPIOC->MODER |= GPIO_MODER_MODER11_1;
-    GPIOC->OSPEED |= (GPIO_OSPEEDER_OSPEEDR11_1 | GPIO_OSPEEDER_OSPEEDR11_0);
+    GPIOC->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR11_1 | GPIO_OSPEEDER_OSPEEDR11_0);
     GPIOC->PUPDR |= GPIO_PUPDR_PUPDR11_0;
     GPIOC->AFR[1] |= (0xD << 12);
 
     // D5
     GPIOB->MODER |= GPIO_MODER_MODER6_1;
-    GPIOB->OSPEED |= (GPIO_OSPEEDER_OSPEEDR6_1 | GPIO_OSPEEDER_OSPEEDR6_0);
+    GPIOB->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR6_1 | GPIO_OSPEEDER_OSPEEDR6_0);
     GPIOB->PUPDR |= GPIO_PUPDR_PUPDR6_0;
     GPIOB->AFR[0] |= (0xD << 24);
 
     // D6
     GPIOB->MODER |= GPIO_MODER_MODER8_1;
-    GPIOB->OSPEED |= (GPIO_OSPEEDER_OSPEEDR8_1 | GPIO_OSPEEDER_OSPEEDR8_0);
+    GPIOB->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR8_1 | GPIO_OSPEEDER_OSPEEDR8_0);
     GPIOB->PUPDR |= GPIO_PUPDR_PUPDR8_0;
     GPIOB->AFR[1] |= (0xD << 0);
 
     // D7
     GPIOB->MODER |= GPIO_MODER_MODER9_1;
-    GPIOB->OSPEED |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
+    GPIOB->OSPEEDR |= (GPIO_OSPEEDER_OSPEEDR9_1 | GPIO_OSPEEDER_OSPEEDR9_0);
     GPIOB->PUPDR |= GPIO_PUPDR_PUPDR9_0;
     GPIOB->AFR[1] |= (0xD << 4);
 
@@ -315,7 +315,7 @@ void DCMI_init() {
     
 	DMA2_Stream1->PAR |= (uint32_t) (&DCMI->DR);
 	DMA2_Stream1->M0AR |= (uint32_t)&temp_buffer;
-	DMA2_Stream1->NDTR = (IMG_ROWS * IMG_COLUMNS) / 4;
+	DMA2_Stream1->NDTR = (IMG_ROWS * IMG_COLUMNS) / 2;
 
     // 3. Настройка
     // 3.1 DMA_SxCR_CIRC - Включаем круговой режим работы
@@ -354,50 +354,43 @@ void MCO1_init() {
     GPIOA->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR8; //High speed
 
     //AF0->MCO
-    GPIOA->AFR[1] |= (GPIO_AF_MCO << GPIO_AFRH_AFSEL0_Pos);
+    GPIOA->AFR[1] |= (GPIO_AF_MCO << 0);
     RCC->CFGR &= ~RCC_CFGR_MCO1; //HSI
 }
 //===========================================================================================================
-
-void dumpFrame(void) {
-
-	uint8_t *buffer = (uint8_t *) frame_buffer;
-	int length = IMG_ROWS * IMG_COLUMNS * 2;
-	// Copy every other byte from the main frame buffer to our temporary buffer (this converts the image to grey scale)
-	int i;
-	for (i = 1; i < length; i += 2) {
-		temp_buffer[i / 2] = buffer[i];
-	}
-	// We only send the sync frame if it has been requested
-	if (send_sync_frame) {
-		for (i = 0x7f; i > 0; i--) {
-			uint8_t val = i;
-			Serial_sendb(&val);
-		}
-		send_sync_frame = false;
-	}
-
-	for (i = 0; i < (length / 2); i++) {
-		if (i > 100) {
-			Serial_sendb(&temp_buffer[i]);
-		} else {
-			uint8_t val = 0xff;
-			Serial_sendb(&val); // Change first 100 pixels to white to provide a reference for where the frame starts
-		}
-	}
+void dumpFrame() {
 	// Enable capture and DMA after we have sent the photo. This is a workaround for the timing issues I've been having where
 	// the DMA transfer is not in sync with the frames being sent
-	DMA_Cmd(DMA2_Stream1, ENABLE);
-	DCMI_Cmd(ENABLE);
-	DCMI_CaptureCmd(ENABLE);
+	DMA2_Stream1->NDTR = (IMG_ROWS * IMG_COLUMNS) / 2;
+	DMA2_Stream1->CR |= DMA_SxCR_EN;
+}
+
+void GPIO_init() {
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
+    GPIOD->MODER |= (GPIO_MODER_MODER12_0 | GPIO_MODER_MODER13_0);
+    GPIOD->ODR &= ~GPIO_ODR_OD12;
+    GPIOD->ODR &= ~GPIO_ODR_OD13;
 }
 
 int main(void) {
     I2C2_init();
+	MCO1_init();
+	OV7670_init();
+	DCMI_init();
 
+    uint8_t err;
+    err = OV7670_init();
+    if (err == ERROR) {
+        GPIOD->ODR |= GPIO_ODR_OD13;
+        while (1);
+    }
 
+    GPIOD->ODR |= GPIO_ODR_OD12;
 	while(1) {
-
+        if (frame_flag == SUCCESS) {
+			frame_flag = ERROR;
+			dumpFrame();
+		}
 	}
 }
 
