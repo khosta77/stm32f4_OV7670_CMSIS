@@ -144,8 +144,8 @@ const uint8_t OV7670_reg[OV7670_REG_NUM][2] = {
 	{ 0x9a, 0x00 },  //
 	{ 0xb1, 0x0c },  //
     { 0xb2, 0x0e },  //
-	{ 0xb3, 0x82 },  //
-	{ 0x4b, 0x01 } 
+//	{ 0xb3, 0x82 },  //
+//	{ 0x4b, 0x01 } 
 };
 
 void Delay(uint32_t nCount) {
@@ -219,15 +219,15 @@ int OV7670_init() {
 //===========================================================================================================
 void DMA2_Stream1_IRQHandler(void) {
 	if((DMA2->LISR & DMA_LISR_TCIF1) == DMA_LISR_TCIF1) {
-		DMA2->LIFCR = DMA_LIFCR_CTCIF1;
+		//DMA2->LIFCR = DMA_LIFCR_CTCIF1;
 	} else if ((DMA2->LISR & DMA_LISR_TEIF1) == DMA_LISR_TEIF1) {
-        DMA2->LIFCR = DMA_LIFCR_CTEIF1;
+        //DMA2->LIFCR = DMA_LIFCR_CTEIF1;
     }
 }
 
 void DCMI_IRQHandler(void) {
     if ((DCMI->RISR & DCMI_RIS_FRAME_RIS) == DCMI_RIS_FRAME_RIS) {
-        DCMI->ICR |= DCMI_ICR_FRAME_ISC;
+        //DCMI->ICR |= DCMI_ICR_FRAME_ISC;
         // disable DMA
     }
     if ((DCMI->RISR & DCMI_RIS_OVR_RIS) == DCMI_RIS_OVR_RIS) {
@@ -332,12 +332,12 @@ void DCMI_init() {
     NVIC_SetPriority(DMA2_Stream1_IRQn, 0);
 
     // 5. Запуск
-	DMA2_Stream1->CR |= DMA_SxCR_EN;
+	//DMA2_Stream1->CR |= DMA_SxCR_EN;
 
     /* DCMI */
-    DCMI->IER |= (DCMI_IER_FRAME_IE | DCMI_IER_OVF_IE | DCMI_IER_ERR_IE);
-    NVIC_EnableIRQ(DCMI_IRQn);
-    NVIC_SetPriority(DCMI_IRQn, 1);
+ //   DCMI->IER |= (DCMI_IER_FRAME_IE | DCMI_IER_OVF_IE | DCMI_IER_ERR_IE);
+   // NVIC_EnableIRQ(DCMI_IRQn);
+  //  NVIC_SetPriority(DCMI_IRQn, 1);
     DCMI->CR |= (DCMI_CR_CM | DCMI_CR_VSPOL | DCMI_CR_HSPOL | DCMI_CR_PCKPOL | DCMI_CR_ENABLE);
 }
 //===========================================================================================================
@@ -362,34 +362,38 @@ void dumpFrame() {
 	// Enable capture and DMA after we have sent the photo. This is a workaround for the timing issues I've been having where
 	// the DMA transfer is not in sync with the frames being sent
 	DMA2_Stream1->NDTR = (IMG_ROWS * IMG_COLUMNS) / 2;
-	DMA2_Stream1->CR |= DMA_SxCR_EN;
+	//DMA2_Stream1->CR |= DMA_SxCR_EN;
 }
 
 void GPIO_init() {
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
-    GPIOD->MODER |= (GPIO_MODER_MODER12_0 | GPIO_MODER_MODER13_0);
-    GPIOD->ODR &= ~GPIO_ODR_OD12;
-    GPIOD->ODR &= ~GPIO_ODR_OD13;
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+    GPIOB->MODER |= (GPIO_MODER_MODER12_0 | GPIO_MODER_MODER13_0);
+    GPIOB->ODR &= ~GPIO_ODR_OD12;
+    GPIOB->ODR &= ~GPIO_ODR_OD13;
 }
 
 int main(void) {
+    //GPIO_init();
+    //GPIOB->ODR |= GPIO_ODR_OD13;
     I2C2_init();
 	MCO1_init();
-	OV7670_init();
+	//OV7670_init();
 	DCMI_init();
 
-    uint8_t err;
+    GPIOB->ODR |= GPIO_ODR_OD13;
+    int err;
     err = OV7670_init();
     if (err == ERROR) {
-        GPIOD->ODR |= GPIO_ODR_OD13;
-        while (1);
+      //  GPIOB->ODR |= GPIO_ODR_OD13;
+        while (1) {}
     }
 
-    GPIOD->ODR |= GPIO_ODR_OD12;
+   // GPIOB->ODR |= GPIO_ODR_OD12;
 	while(1) {
         if (frame_flag == SUCCESS) {
+           // Delay(0xFFFFF);
 			frame_flag = ERROR;
-			dumpFrame();
+	//		dumpFrame();
 		}
 	}
 }
