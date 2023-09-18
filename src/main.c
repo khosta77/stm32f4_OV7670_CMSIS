@@ -155,7 +155,7 @@ void Delay(uint32_t nCount) {
 void I2C2_init() {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
     GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR10 | GPIO_OSPEEDER_OSPEEDR11;
-    GPIOB->MODER |= GPIO_MODER_MODER10_1 | GPIO_MODER_MODER11_1;
+    GPIOB->MODER |= GPIO_MODER_MODER10_1 | GPIO_MODER_MODER11_1;  // SCL | SDA
     GPIOB->OTYPER |= GPIO_OTYPER_OT_10 | GPIO_OTYPER_OT_11;
     GPIOB->PUPDR |= GPIO_PUPDR_PUPDR10_0 | GPIO_PUPDR_PUPDR11_0;
     GPIOB->AFR[1] |= ((0x4 << 8) | (0x4 << 12));//GPIO_AFRH_AFRH10_2 | GPIO_AFRH_AFRH11_2;
@@ -169,15 +169,22 @@ void I2C2_init() {
 
 #define SUCCESS 0
 #define ERROR -1
+// Ошибка где то здесь
 
 int SCCB_write_reg(uint8_t reg_addr, uint8_t data) {
-	uint32_t timeout = 0x7FFFFF;
+	uint32_t timeout = 0x7F;
 
-	while (I2C2->SR2 & I2C_SR2_BUSY)  // Тайм-аут занятости
-		if ((timeout--) == 0) return ERROR;
+
+    GPIOD->ODR |= GPIO_ODR_OD14;
+
+	while (I2C2->SR2 & I2C_SR2_BUSY) ; // Тайм-аут занятости
+	//	if ((timeout--) == 0) return ERROR;
+
+    GPIOD->ODR |= GPIO_ODR_OD15;
 
 	// Send start bit
     I2C2->CR1 |= I2C_CR1_START;
+ //   GPIOD->ODR |= GPIO_ODR_OD13;
 
 	while (!(I2C2->SR1 & I2C_SR1_SB))  // Тайм-аут начального бита
 		if ((timeout--) == 0) return ERROR;
@@ -208,6 +215,8 @@ int OV7670_init() {
 
 	// Configure camera registers
 	for (uint8_t i = 0; i < OV7670_REG_NUM; i++) {
+            GPIOD->ODR |= GPIO_ODR_OD13;
+
 		err = SCCB_write_reg(OV7670_reg[i][0], OV7670_reg[i][1]);
 		
         if (err == ERROR) break;
@@ -219,9 +228,9 @@ int OV7670_init() {
 //===========================================================================================================
 void DMA2_Stream1_IRQHandler(void) {
 	if((DMA2->LISR & DMA_LISR_TCIF1) == DMA_LISR_TCIF1) {
-		//DMA2->LIFCR = DMA_LIFCR_CTCIF1;
+		DMA2->LIFCR |= DMA_LIFCR_CTCIF1;
 	} else if ((DMA2->LISR & DMA_LISR_TEIF1) == DMA_LISR_TEIF1) {
-        //DMA2->LIFCR = DMA_LIFCR_CTEIF1;
+        DMA2->LIFCR |= DMA_LIFCR_CTEIF1;
     }
 }
 
@@ -357,43 +366,70 @@ void MCO1_init() {
     GPIOA->AFR[1] |= (GPIO_AF_MCO << 0);
     RCC->CFGR &= ~RCC_CFGR_MCO1; //HSI
 }
+
+void TIM4_IRQHandler(void) {
+	TIM4->SR &= ~TIM_SR_UIF;
+	TIM4->CR1 &= ~TIM_CR1_CEN;
+    TIM4->CR1 |= TIM_CR1_CEN;
+}
+
+void PWM_init() {
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
+    GPIOD->MODER |= (0x2 << (2 * 12));
+    GPIOD->AFR[1] |= (0x2 << 16);
+    RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
+    TIM4->PSC = 2;
+    TIM4->ARR = 2;
+    TIM4->CCMR1 |= 0x60;
+    TIM4->CCR1 = 2;
+    TIM4->CCER |= 0x1;
+    TIM4->DIER |= TIM_DIER_UIE;
+    NVIC_EnableIRQ(TIM4_IRQn);
+    NVIC_SetPriority(TIM4_IRQn, 2);
+    TIM4->CR1 |= TIM_CR1_CEN;
+}
 //===========================================================================================================
 void dumpFrame() {
 	// Enable capture and DMA after we have sent the photo. This is a workaround for the timing issues I've been having where
 	// the DMA transfer is not in sync with the frames being sent
 	DMA2_Stream1->NDTR = (IMG_ROWS * IMG_COLUMNS) / 2;
-	//DMA2_Stream1->CR |= DMA_SxCR_EN;
+	DMA2_Stream1->CR |= DMA_SxCR_EN;
 }
 
 void GPIO_init() {
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-    GPIOB->MODER |= (GPIO_MODER_MODER12_0 | GPIO_MODER_MODER13_0);
-    GPIOB->ODR &= ~GPIO_ODR_OD12;
-    GPIOB->ODR &= ~GPIO_ODR_OD13;
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
+    GPIOD->MODER |= (GPIO_MODER_MODER13_0 | GPIO_MODER_MODER14_0 | GPIO_MODER_MODER15_0);
+    GPIOD->ODR &= ~GPIO_ODR_OD13;
+    GPIOD->ODR &= ~GPIO_ODR_OD14;
+    GPIOD->ODR &= ~GPIO_ODR_OD15;
 }
 
 int main(void) {
-    //GPIO_init();
-    //GPIOB->ODR |= GPIO_ODR_OD13;
+    GPIO_init();
+   // GPIOD->ODR |= GPIO_ODR_OD13;
     I2C2_init();
-	MCO1_init();
-	//OV7670_init();
+   // GPIOD->ODR |= GPIO_ODR_OD14;
+  //  PWM_init();
+  //  GPIOD->ODR |= GPIO_ODR_OD15;
+    //MCO1_init();
+//	OV7670_init();
 	DCMI_init();
 
-    GPIOB->ODR |= GPIO_ODR_OD13;
+   // GPIOD->ODR |= GPIO_ODR_OD13;
     int err;
     err = OV7670_init();
+    //GPIOD->ODR |= GPIO_ODR_OD14;
     if (err == ERROR) {
-      //  GPIOB->ODR |= GPIO_ODR_OD13;
+      //  GPIOD->ODR |= GPIO_ODR_OD15;
         while (1) {}
     }
 
-   // GPIOB->ODR |= GPIO_ODR_OD12;
+   // GPIOD->ODR |= GPIO_ODR_OD15;
 	while(1) {
         if (frame_flag == SUCCESS) {
-           // Delay(0xFFFFF);
+            //Delay(0xFFF);
 			frame_flag = ERROR;
-	//		dumpFrame();
+			dumpFrame();
 		}
 	}
 }
