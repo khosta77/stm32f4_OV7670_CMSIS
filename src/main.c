@@ -281,10 +281,6 @@ bool SCCB_write_reg(uint8_t reg_addr, uint8_t* data) {
 	I2C2->CR1 |= I2C_CR1_STOP;
     return SUCCESS;
 #else
-    GPIOD->ODR |= GPIO_ODR_OD13;
-    HAL_I2C_Master_Transmit(&I2C_InitStructure, reg_addr, data, 1, HAL_TIMEOUT);
-    GPIOD->ODR |= GPIO_ODR_OD14;
-/*
     uint32_t timeout = 0x7FFFFF;
 
 	while (I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY)) {
@@ -337,7 +333,7 @@ bool SCCB_write_reg(uint8_t reg_addr, uint8_t* data) {
 	// Send stop bit
 	I2C_GenerateSTOP(I2C2, ENABLE);
 	return false;
-*/
+
     return true;
 #endif
 }
@@ -806,7 +802,7 @@ void SystemInit(void)
 
 int main(void) {
 #if 1
-    GPIO_init();
+    my_GPIO_init();
    // GPIOD->ODR |= GPIO_ODR_OD13;
     I2C2_init();
    // GPIOD->ODR |= GPIO_ODR_OD14;
@@ -816,10 +812,10 @@ int main(void) {
 //	OV7670_init();
 	DCMI_init();
 
-   // GPIOD->ODR |= GPIO_ODR_OD13;
+    GPIOD->ODR |= GPIO_ODR_OD13;
     int err;
     err = OV7670_init();
-    //GPIOD->ODR |= GPIO_ODR_OD14;
+    GPIOD->ODR |= GPIO_ODR_OD14;
     if (err == ERROR) {
       //  GPIOD->ODR |= GPIO_ODR_OD15;
         while (1) {}
