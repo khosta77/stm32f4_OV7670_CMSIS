@@ -698,10 +698,10 @@ void PWM_init() {
     GPIOD->MODER |= (0x2 << (2 * 12));
     GPIOD->AFR[1] |= (0x2 << 16);
     RCC->APB1ENR |= RCC_APB1ENR_TIM4EN;
-    TIM4->PSC = 2;
-    TIM4->ARR = 2;
+    TIM4->PSC = 50;//20;
+    TIM4->ARR = 40;//100;
     TIM4->CCMR1 |= 0x60;
-    TIM4->CCR1 = 2;
+    TIM4->CCR1 = 1;
     TIM4->CCER |= 0x1;
     TIM4->DIER |= TIM_DIER_UIE;
     NVIC_EnableIRQ(TIM4_IRQn);
@@ -751,8 +751,8 @@ void dumpFrame() {
 
 void my_GPIO_init() {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
-    GPIOD->MODER |= (GPIO_MODER_MODER13_0 | GPIO_MODER_MODER13_0 | GPIO_MODER_MODER14_0 | GPIO_MODER_MODER15_0);
-    GPIOD->ODR &= ~GPIO_ODR_OD12;
+    GPIOD->MODER |= (/*GPIO_MODER_MODER13_0 |*/ GPIO_MODER_MODER13_0 | GPIO_MODER_MODER14_0 | GPIO_MODER_MODER15_0);
+//    GPIOD->ODR &= ~GPIO_ODR_OD12;
     GPIOD->ODR &= ~GPIO_ODR_OD13;
     GPIOD->ODR &= ~GPIO_ODR_OD14;
     GPIOD->ODR &= ~GPIO_ODR_OD15;
@@ -807,22 +807,24 @@ int main(void) {
    // GPIOD->ODR |= GPIO_ODR_OD13;
     I2C2_init();
    // GPIOD->ODR |= GPIO_ODR_OD14;
-  //  PWM_init();
+    PWM_init();
+    GPIOD->ODR |= GPIO_ODR_OD15;
   //  GPIOD->ODR |= GPIO_ODR_OD15;
-    MCO1_init();
+  //  MCO1_init();
 //	OV7670_init();
 	DCMI_init();
-
     GPIOD->ODR |= GPIO_ODR_OD13;
+
+ //   GPIOD->ODR |= GPIO_ODR_OD13;
     int err;
     err = OV7670_init();
     GPIOD->ODR |= GPIO_ODR_OD14;
     if (err == ERROR) {
-        GPIOD->ODR |= GPIO_ODR_OD15;
+   //     GPIOD->ODR |= GPIO_ODR_OD15;
         while (1) {}
     }
 
-    GPIOD->ODR |= GPIO_ODR_OD12;
+   // GPIOD->ODR |= GPIO_ODR_OD13;
 	while(1) {
         if (frame_flag == SUCCESS) {
             //Delay(0xFFF);
