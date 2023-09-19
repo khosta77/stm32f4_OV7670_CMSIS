@@ -1,5 +1,8 @@
 #include "../system/include/cmsis/stm32f4xx.h"
+#include "../system/include/stm32f4-hal/stm32f4xx_hal.h"
+#include <stdbool.h>
 //===========================================================================================================
+#if 0
 // SCCB write address
 #define SCCB_REG_ADDR 		0x01
 
@@ -12,7 +15,12 @@
 #define IMG_COLUMNS   		174
 
 uint8_t temp_buffer[IMG_ROWS * IMG_COLUMNS];
-int frame_flag = 0;
+//int frame_flag = 0;
+volatile uint16_t frame_buffer[IMG_ROWS * IMG_COLUMNS];
+I2C_HandleTypeDef I2C_InitStructure;
+
+static volatile bool frame_flag = false;
+static volatile bool send_sync_frame = false;
 
 const uint8_t OV7670_reg[OV7670_REG_NUM][2] = { 
     { 0x12, 0x80 },
@@ -149,10 +157,12 @@ const uint8_t OV7670_reg[OV7670_REG_NUM][2] = {
 };
 
 void Delay(uint32_t nCount) {
-	while (nCount--);
+	while (nCount--) {
+    }
 }
 //===========================================================================================================
 void I2C2_init() {
+#if 0
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
     GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR10 | GPIO_OSPEEDER_OSPEEDR11;
     GPIOB->MODER |= GPIO_MODER_MODER10_1 | GPIO_MODER_MODER11_1;  // SCL | SDA
@@ -165,22 +175,81 @@ void I2C2_init() {
     I2C2->CCR = 0xD2;
     I2C2->TRISE = 0x2B;
     I2C2->CR1 |= I2C_CR1_PE;
+#else
+    GPIO_InitTypeDef GPIO_InitStructure;
+
+	//RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
+	//RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+	//RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+
+    __HAL_RCC_I2C2_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+	// GPIO config
+	GPIO_InitStructure.Pin = GPIO_PIN_10;
+	GPIO_InitStructure.Mode = GPIO_MODE_AF_OD;
+	GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_LOW;
+//	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+	GPIO_InitStructure.Pull = GPIO_PULLUP;
+    GPIO_InitStructure.Alternate = GPIO_AF4_I2C2;
+	HAL_GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	GPIO_InitStructure.Pin = GPIO_PIN_12;
+	GPIO_InitStructure.Mode = GPIO_MODE_AF_OD;
+	GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_LOW;
+//	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+	GPIO_InitStructure.Pull = GPIO_PULLUP;
+    GPIO_InitStructure.Alternate = GPIO_AF4_I2C2;
+	HAL_GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	// GPIO AF config
+	//GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_I2C2);
+	//GPIO_PinAFConfig(GPIOC, GPIO_PinSource12, GPIO_AF_I2C2);
+
+	// I2C config
+	//I2C_DeInit(I2C2);
+    I2C_InitStructure.Instance = I2C2;
+    I2C_InitStructure.Init.ClockSpeed = 100000;
+    I2C_InitStructure.Init.DutyCycle = I2C_DUTYCYCLE_2;
+    I2C_InitStructure.Init.OwnAddress1 = 0x0;
+    I2C_InitStructure.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+    I2C_InitStructure.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+    I2C_InitStructure.Init.OwnAddress2 = 0;
+    I2C_InitStructure.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+    I2C_InitStructure.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+    HAL_I2C_Init(&I2C_InitStructure);
+
+	//I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
+	//I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
+	//I2C_InitStructure.I2C_OwnAddress1 = 0x00;
+	//I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
+	//I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+	//I2C_InitStructure.I2C_ClockSpeed = 100000;
+	//I2C_ITConfig(I2C2, I2C_IT_ERR, ENABLE);
+	//I2C_Init(I2C2, &I2C_InitStructure);
+	//I2C_Cmd(I2C2, ENABLE);
+#endif
 }
 
 #define SUCCESS 0
 #define ERROR -1
 // Ошибка где то здесь
 
+#define I2C2_CMSIS 1
+#if I2C2_CMSIS
 int SCCB_write_reg(uint8_t reg_addr, uint8_t data) {
+#else
+bool SCCB_write_reg(uint8_t reg_addr, uint8_t* data) {
+#endif
+#if I2C2_CMSIS
 	uint32_t timeout = 0x7F;
 
 
-    GPIOD->ODR |= GPIO_ODR_OD14;
 
 	while (I2C2->SR2 & I2C_SR2_BUSY) ; // Тайм-аут занятости
 	//	if ((timeout--) == 0) return ERROR;
 
-    GPIOD->ODR |= GPIO_ODR_OD15;
 
 	// Send start bit
     I2C2->CR1 |= I2C_CR1_START;
@@ -208,14 +277,77 @@ int SCCB_write_reg(uint8_t reg_addr, uint8_t data) {
 	// Send stop bit
 	I2C2->CR1 |= I2C_CR1_STOP;
     return SUCCESS;
+#else
+    GPIOD->ODR |= GPIO_ODR_OD13;
+    HAL_I2C_Master_Transmit(&I2C_InitStructure, reg_addr, data, 1, HAL_TIMEOUT);
+    GPIOD->ODR |= GPIO_ODR_OD14;
+/*
+    uint32_t timeout = 0x7FFFFF;
+
+	while (I2C_GetFlagStatus(I2C2, I2C_FLAG_BUSY)) {
+		if ((timeout--) == 0) {
+			//Serial_log("Busy Timeout\r\n");
+			return true;
+		}
+	}
+
+	// Send start bit
+	I2C_GenerateSTART(I2C2, ENABLE);
+
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_MODE_SELECT)) {
+		if ((timeout--) == 0) {
+			//Serial_log("Start bit Timeout\r\n");
+			return true;
+		}
+	}
+
+	// Send slave address (camera write address)
+	I2C_Send7bitAddress(I2C2, OV7670_WRITE_ADDR, I2C_Direction_Transmitter);
+
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED)) {
+		if ((timeout--) == 0) {
+			//Serial_log("Slave address timeout\r\n");
+			return true;
+		}
+	}
+
+	// Send register address
+	I2C_SendData(I2C2, reg_addr);
+
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED)) {
+		if ((timeout--) == 0) {
+			//Serial_log("Register timeout\r\n");
+			return true;
+		}
+	}
+
+	// Send new register value
+	I2C_SendData(I2C2, *data);
+
+	while (!I2C_CheckEvent(I2C2, I2C_EVENT_MASTER_BYTE_TRANSMITTED)) {
+		if ((timeout--) == 0) {
+			//Serial_log("Value timeout\r\n");
+			return true;
+		}
+	}
+
+	// Send stop bit
+	I2C_GenerateSTOP(I2C2, ENABLE);
+	return false;
+*/
+    return true;
+#endif
 }
 
+#define OV7670_INIT_CMSIS 1
+
+#if OV7670_INIT_CMSIS
 int OV7670_init() {
-	int err;
+	int err = SUCCESS;
 
 	// Configure camera registers
 	for (uint8_t i = 0; i < OV7670_REG_NUM; i++) {
-            GPIOD->ODR |= GPIO_ODR_OD13;
+          //  GPIOD->ODR |= GPIO_ODR_OD13;
 
 		err = SCCB_write_reg(OV7670_reg[i][0], OV7670_reg[i][1]);
 		
@@ -224,8 +356,66 @@ int OV7670_init() {
 	}
 
 	return err;
+#else
+bool OV7670_init() {
+   // bool OV7670_init(void) {
+	uint8_t data, i = 0;
+	bool err;
+
+	// Configure camera registers
+	for (i = 0; i < OV7670_REG_NUM; i++) {
+		data = OV7670_reg[i][1];
+		err = SCCB_write_reg(OV7670_reg[i][0], &data);
+		//Serial_log("Writing register: ");
+		//Serial_logi(i);
+		//Serial_log("\r\n");
+
+		if (err == true) {
+			//Serial_log("Failed to update register\r\n");
+			break;
+		}
+
+		Delay(0xFFFF);
+	}
+
+	return err;
+#endif
 }
 //===========================================================================================================
+
+#if 0
+void DMA2_Stream1_IRQHandler(void) {
+	// DMA complete
+	if (DMA_GetITStatus(DMA2_Stream1, DMA_IT_TCIF1) != RESET) { // Transfer complete
+		DMA_ClearITPendingBit(DMA2_Stream1, DMA_IT_TCIF1);
+		frame_flag = true;
+	} else if (DMA_GetITStatus(DMA2_Stream1, DMA_IT_TEIF1) != RESET) { // Transfer error
+		// Not used, just for debug
+		DMA_ClearITPendingBit(DMA2_Stream1, DMA_IT_TEIF1);
+	}
+}
+
+void DCMI_IRQHandler(void) {
+	if (DCMI_GetFlagStatus(DCMI_FLAG_FRAMERI) == SET) { // Frame received
+		DCMI_ClearFlag(DCMI_FLAG_FRAMERI);
+		// After receiving a full frame we disable capture and the DMA transfer. This is probably a very inefficient way of capturing and sending frames
+		// but it's the only way I've gotten to reliably work.
+		DMA_Cmd(DMA2_Stream1, DISABLE);
+		DCMI_Cmd(DISABLE);
+		DCMI_CaptureCmd(DISABLE);
+	}
+	if (DCMI_GetFlagStatus(DCMI_FLAG_OVFRI) == SET) { // Overflow
+		// Not used, just for debug
+		DCMI_ClearFlag(DCMI_FLAG_OVFRI);
+	}
+	if (DCMI_GetFlagStatus(DCMI_FLAG_ERRRI) == SET) { // Error
+		// Not used, just for debug
+		DCMI_ClearFlag(DCMI_FLAG_ERRRI);
+	}
+}
+#endif
+
+#if 1
 void DMA2_Stream1_IRQHandler(void) {
 	if((DMA2->LISR & DMA_LISR_TCIF1) == DMA_LISR_TCIF1) {
 		DMA2->LIFCR |= DMA_LIFCR_CTCIF1;
@@ -246,8 +436,10 @@ void DCMI_IRQHandler(void) {
 
     }
 }
+#endif
 
 void DCMI_init() {
+#if 1
     /* GPIO */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
@@ -348,11 +540,119 @@ void DCMI_init() {
    // NVIC_EnableIRQ(DCMI_IRQn);
   //  NVIC_SetPriority(DCMI_IRQn, 1);
     DCMI->CR |= (DCMI_CR_CM | DCMI_CR_VSPOL | DCMI_CR_HSPOL | DCMI_CR_PCKPOL | DCMI_CR_ENABLE);
+#else
+    GPIO_InitTypeDef GPIO_InitStructure;
+	DCMI_InitTypeDef DCMI_InitStructure;
+	DMA_InitTypeDef DMA_InitStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+
+	RCC_AHB2PeriphClockCmd(RCC_AHB2Periph_DCMI, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
+
+	// GPIO config
+
+	// PA4 - HREF (HSYNC), PA6 - PCLK (PIXCLK)
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_6;	//PA4 - HREF (HSYNC)
+															//PA6 - PCLK (PIXCLK)
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	// PB6 - D5, PB7 - VSYNC, PB8 - D6, PB9 - D7
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	// PC6 - D0, PC7 - D1, PC8 - D2, PC9 - D3, PC11 - D4
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7 | GPIO_Pin_8 | GPIO_Pin_9 | GPIO_Pin_11;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	// GPIO AF config
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource4, GPIO_AF_DCMI);
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource6, GPIO_AF_DCMI);
+
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource6, GPIO_AF_DCMI);
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource7, GPIO_AF_DCMI);
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource8, GPIO_AF_DCMI);
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource9, GPIO_AF_DCMI);
+
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource6, GPIO_AF_DCMI);
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource7, GPIO_AF_DCMI);
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource8, GPIO_AF_DCMI);
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource9, GPIO_AF_DCMI);
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource11, GPIO_AF_DCMI);
+
+	// DCMI config
+	DCMI_DeInit();
+	DCMI_InitStructure.DCMI_CaptureMode = DCMI_CaptureMode_SnapShot; //DCMI_CaptureMode_SnapShot
+	DCMI_InitStructure.DCMI_ExtendedDataMode = DCMI_ExtendedDataMode_8b;
+	DCMI_InitStructure.DCMI_CaptureRate = DCMI_CaptureRate_All_Frame; //DCMI_CaptureRate_All_Frame;
+	DCMI_InitStructure.DCMI_PCKPolarity = DCMI_PCKPolarity_Rising;
+	DCMI_InitStructure.DCMI_HSPolarity = DCMI_HSPolarity_Low;
+	DCMI_InitStructure.DCMI_VSPolarity = DCMI_VSPolarity_High;
+	DCMI_InitStructure.DCMI_SynchroMode = DCMI_SynchroMode_Hardware;
+	DCMI_Init(&DCMI_InitStructure);
+	DCMI_ITConfig(DCMI_IT_FRAME, ENABLE);
+	DCMI_ITConfig(DCMI_IT_OVF, ENABLE);
+	DCMI_ITConfig(DCMI_IT_ERR, ENABLE);
+
+	// DMA config
+	DMA_DeInit(DMA2_Stream1);
+	DMA_InitStructure.DMA_Channel = DMA_Channel_1;
+	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t) (&DCMI->DR);
+	DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t) frame_buffer;
+	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
+	DMA_InitStructure.DMA_BufferSize = IMG_ROWS * IMG_COLUMNS / 2;
+	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+	DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Word;
+	DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Word;
+	DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;
+	DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+	DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Enable;
+	DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
+	DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+	DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+	DMA_Init(DMA2_Stream1, &DMA_InitStructure);
+	DMA_ITConfig(DMA2_Stream1, DMA_IT_TC, ENABLE);
+	DMA_ITConfig(DMA2_Stream1, DMA_IT_TE, ENABLE);
+
+	/* DMA2 IRQ channel Configuration */
+	NVIC_InitStructure.NVIC_IRQChannel = DMA2_Stream1_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
+	NVIC_InitStructure.NVIC_IRQChannel = DCMI_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 2;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+
+	DMA_Cmd(DMA2_Stream1, ENABLE);
+	DCMI_Cmd(ENABLE);
+	DCMI_CaptureCmd(ENABLE);
+#endif
 }
 //===========================================================================================================
 #define GPIO_AF_MCO    0x00UL
 
 void MCO1_init() {
+#if 1
     //enable clock for GPIOA
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 	
@@ -365,6 +665,27 @@ void MCO1_init() {
     //AF0->MCO
     GPIOA->AFR[1] |= (GPIO_AF_MCO << 0);
     RCC->CFGR &= ~RCC_CFGR_MCO1; //HSI
+#else
+    GPIO_InitTypeDef GPIO_InitStructure;
+
+	RCC_ClockSecuritySystemCmd(ENABLE);
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+
+	// GPIO config
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;		//PA8 - XCLK
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOA, &GPIO_InitStructure);
+
+	// GPIO AF config
+	GPIO_PinAFConfig(GPIOA, GPIO_PinSource8, GPIO_AF_MCO);
+
+	// MCO clock source
+//	RCC_MCO1Config(RCC_MCO1Source_PLLCLK, RCC_MCO1Div_4); // Using the fast PLL clock results in garbage output, using HSI (at 16Mhz works fine)
+	RCC_MCO1Config(RCC_MCO1Source_HSI, RCC_MCO1Div_1);
+#endif
 }
 
 void TIM4_IRQHandler(void) {
@@ -390,13 +711,46 @@ void PWM_init() {
 }
 //===========================================================================================================
 void dumpFrame() {
+#if 0
 	// Enable capture and DMA after we have sent the photo. This is a workaround for the timing issues I've been having where
 	// the DMA transfer is not in sync with the frames being sent
 	DMA2_Stream1->NDTR = (IMG_ROWS * IMG_COLUMNS) / 2;
 	DMA2_Stream1->CR |= DMA_SxCR_EN;
+#else
+
+	uint8_t *buffer = (uint8_t *) frame_buffer;
+	int length = IMG_ROWS * IMG_COLUMNS * 2;
+	// Copy every other byte from the main frame buffer to our temporary buffer (this converts the image to grey scale)
+	int i;
+	for (i = 1; i < length; i += 2) {
+		temp_buffer[i / 2] = buffer[i];
+	}
+	// We only send the sync frame if it has been requested
+	if (send_sync_frame) {
+		for (i = 0x7f; i > 0; i--) {
+			uint8_t val = i;
+			//Serial_sendb(&val);
+		}
+		send_sync_frame = false;
+	}
+
+	for (i = 0; i < (length / 2); i++) {
+		if (i > 100) {
+		//	Serial_sendb(&temp_buffer[i]);
+		} else {
+			uint8_t val = 0xff;
+		//	Serial_sendb(&val); // Change first 100 pixels to white to provide a reference for where the frame starts
+		}
+	}
+	// Enable capture and DMA after we have sent the photo. This is a workaround for the timing issues I've been having where
+	// the DMA transfer is not in sync with the frames being sent
+	//DMA_Cmd(DMA2_Stream1, ENABLE);
+	//DCMI_Cmd(ENABLE);
+	//DCMI_CaptureCmd(ENABLE);
+#endif
 }
 
-void GPIO_init() {
+void my_GPIO_init() {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
     GPIOD->MODER |= (GPIO_MODER_MODER13_0 | GPIO_MODER_MODER14_0 | GPIO_MODER_MODER15_0);
     GPIOD->ODR &= ~GPIO_ODR_OD13;
@@ -404,7 +758,51 @@ void GPIO_init() {
     GPIOD->ODR &= ~GPIO_ODR_OD15;
 }
 
+#if 0
+void SystemInit(void)
+{
+  /* FPU settings ------------------------------------------------------------*/
+  #if (__FPU_PRESENT == 1) && (__FPU_USED == 1)
+    SCB->CPACR |= ((3UL << 10*2)|(3UL << 11*2));  /* set CP10 and CP11 Full Access */
+  #endif
+  /* Reset the RCC clock configuration to the default reset state ------------*/
+  /* Set HSION bit */
+  RCC->CR |= (uint32_t)0x00000001;
+
+  /* Reset CFGR register */
+  RCC->CFGR = 0x00000000;
+
+  /* Reset HSEON, CSSON and PLLON bits */
+  RCC->CR &= (uint32_t)0xFEF6FFFF;
+
+  /* Reset PLLCFGR register */
+  RCC->PLLCFGR = 0x24003010;
+
+  /* Reset HSEBYP bit */
+  RCC->CR &= (uint32_t)0xFFFBFFFF;
+
+  /* Disable all interrupts */
+  RCC->CIR = 0x00000000;
+
+//#if defined(DATA_IN_ExtSRAM) || defined(DATA_IN_ExtSDRAM)
+  SystemInit_ExtMemCtl(); 
+//#endif /* DATA_IN_ExtSRAM || DATA_IN_ExtSDRAM */
+         
+  /* Configure the System clock source, PLL Multiplier and Divider factors, 
+     AHB/APBx prescalers and Flash settings ----------------------------------*/
+//  SetSysClock();
+
+  /* Configure the Vector Table location add offset address ------------------*/
+//#ifdef VECT_TAB_SRAM
+  //SCB->VTOR = SRAM_BASE | VECT_TAB_OFFSET; /* Vector Table Relocation in Internal SRAM */
+//#else
+  //SCB->VTOR = FLASH_BASE | VECT_TAB_OFFSET; /* Vector Table Relocation in Internal FLASH */
+//#endif
+}
+#endif
+
 int main(void) {
+#if 0
     GPIO_init();
    // GPIOD->ODR |= GPIO_ODR_OD13;
     I2C2_init();
@@ -432,6 +830,43 @@ int main(void) {
 			dumpFrame();
 		}
 	}
+#else
+    bool err;
+
+	//SystemInit();
+        my_GPIO_init();
+	MCO1_init();
+
+	I2C2_init();
+
+    DCMI_init();
+
+    //Serial_init();
+      //  GPIOD->ODR |= GPIO_ODR_OD13;
+
+	// Initialize camera over SCCB
+	err = OV7670_init();
+		GPIOD->ODR |= GPIO_ODR_OD14;
+
+	if (err == true) {
+		GPIOD->ODR |= GPIO_ODR_OD14;
+        //Serial_log("Failed to initialize\r\n");
+		while (1) {
+		}
+	}
+
+    GPIOD->ODR |= GPIO_ODR_OD15;
+	// Infinite program loop
+	while (1) {
+		if (frame_flag == true) {
+			frame_flag = false;
+			dumpFrame();
+		}
+	}
+#endif
+    
 }
+#endif
+
 
 
