@@ -246,12 +246,12 @@ int SCCB_write_reg(uint8_t reg_addr, uint8_t data) {
 bool SCCB_write_reg(uint8_t reg_addr, uint8_t* data) {
 #endif
 #if I2C2_CMSIS
-	uint32_t timeout = 0x7F;
+	uint32_t timeout = 0x7FFF;
 
 
 
 	while (I2C2->SR2 & I2C_SR2_BUSY) ; // Тайм-аут занятости
-	//	if ((timeout--) == 0) return ERROR;
+		if ((timeout--) == 0) return ERROR;
 
 
 	// Send start bit
@@ -751,7 +751,8 @@ void dumpFrame() {
 
 void my_GPIO_init() {
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
-    GPIOD->MODER |= (GPIO_MODER_MODER13_0 | GPIO_MODER_MODER14_0 | GPIO_MODER_MODER15_0);
+    GPIOD->MODER |= (GPIO_MODER_MODER13_0 | GPIO_MODER_MODER13_0 | GPIO_MODER_MODER14_0 | GPIO_MODER_MODER15_0);
+    GPIOD->ODR &= ~GPIO_ODR_OD12;
     GPIOD->ODR &= ~GPIO_ODR_OD13;
     GPIOD->ODR &= ~GPIO_ODR_OD14;
     GPIOD->ODR &= ~GPIO_ODR_OD15;
@@ -808,7 +809,7 @@ int main(void) {
    // GPIOD->ODR |= GPIO_ODR_OD14;
   //  PWM_init();
   //  GPIOD->ODR |= GPIO_ODR_OD15;
-    //MCO1_init();
+    MCO1_init();
 //	OV7670_init();
 	DCMI_init();
 
@@ -817,11 +818,11 @@ int main(void) {
     err = OV7670_init();
     GPIOD->ODR |= GPIO_ODR_OD14;
     if (err == ERROR) {
-      //  GPIOD->ODR |= GPIO_ODR_OD15;
+        GPIOD->ODR |= GPIO_ODR_OD15;
         while (1) {}
     }
 
-   // GPIOD->ODR |= GPIO_ODR_OD15;
+    GPIOD->ODR |= GPIO_ODR_OD12;
 	while(1) {
         if (frame_flag == SUCCESS) {
             //Delay(0xFFF);
