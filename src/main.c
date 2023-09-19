@@ -1,13 +1,11 @@
 #include "../system/include/cmsis/stm32f4xx.h"
 #include "../system/include/stm32f4-hal/stm32f4xx_hal.h"
-#include "../system/include/stm32f4-hal/stm32f4xx_hal_dcmi.h"
-#include "../system/include/stm32f4-hal/stm32f4xx_hal_dcmi_ex.h"
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 //===========================================================================================================
-#if 0
+#if 1
 // SCCB write address
 #define SCCB_REG_ADDR 		0x01
 
@@ -167,7 +165,7 @@ void Delay(uint32_t nCount) {
 }
 //===========================================================================================================
 void I2C2_init() {
-#if 0
+#if 1
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
     GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR10 | GPIO_OSPEEDER_OSPEEDR11;
     GPIOB->MODER |= GPIO_MODER_MODER10_1 | GPIO_MODER_MODER11_1;  // SCL | SDA
@@ -716,7 +714,7 @@ void PWM_init() {
 }
 //===========================================================================================================
 void dumpFrame() {
-#if 0
+#if 1
 	// Enable capture and DMA after we have sent the photo. This is a workaround for the timing issues I've been having where
 	// the DMA transfer is not in sync with the frames being sent
 	DMA2_Stream1->NDTR = (IMG_ROWS * IMG_COLUMNS) / 2;
@@ -807,7 +805,7 @@ void SystemInit(void)
 #endif
 
 int main(void) {
-#if 
+#if 1
     GPIO_init();
    // GPIOD->ODR |= GPIO_ODR_OD13;
     I2C2_init();
