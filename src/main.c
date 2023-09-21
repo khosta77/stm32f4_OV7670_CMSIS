@@ -1,5 +1,12 @@
 #include "../system/include/cmsis/stm32f4xx.h"
-#include "../system/include/stm32f4-hal/stm32f4xx_hal.h"
+//#include "../system/include/stm32f4-hal/stm32f4xx_hal.h"
+#include "../system/include/stm32f4/stm32f4xx_rcc.h"
+#include "../system/include/stm32f4/stm32f4xx_gpio.h"
+#include "../system/include/stm32f4/stm32f4xx_i2c.h"
+#include "../system/include/stm32f4/stm32f4xx_dma.h"
+#include "../system/include/stm32f4/stm32f4xx_dcmi.h"
+#include "../system/include/stm32f4/misc.h"
+
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,13 +21,13 @@
 #define OV7670_WRITE_ADDR 	0x42
 
 // Image settings
-#define IMG_ROWS            144
-#define IMG_COLUMNS   		174
+#define IMG_ROWS            10//144
+#define IMG_COLUMNS   		10//174
 
 uint8_t temp_buffer[IMG_ROWS * IMG_COLUMNS];
 //int frame_flag = 0;
 volatile uint16_t frame_buffer[IMG_ROWS * IMG_COLUMNS];
-I2C_HandleTypeDef I2C_InitStructure;
+//I2C_HandleTypeDef I2C_InitStructure;
 
 static volatile bool frame_flag = false;
 static volatile bool send_sync_frame = false;
@@ -165,7 +172,7 @@ void Delay(uint32_t nCount) {
 }
 //===========================================================================================================
 void I2C2_init() {
-#if 1
+#if 0
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
     GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR10 | GPIO_OSPEEDER_OSPEEDR11;
     GPIOB->MODER |= GPIO_MODER_MODER10_1 | GPIO_MODER_MODER11_1;  // SCL | SDA
@@ -179,6 +186,46 @@ void I2C2_init() {
     I2C2->TRISE = 0x2B;
     I2C2->CR1 |= I2C_CR1_PE;
 #else
+	GPIO_InitTypeDef GPIO_InitStructure;
+	I2C_InitTypeDef I2C_InitStructure;
+
+	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN);
+	RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
+//	RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+
+	// GPIO config
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOB, &GPIO_InitStructure);
+
+	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_12;
+	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+	GPIO_InitStructure.GPIO_Speed = GPIO_Speed_2MHz;
+	GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;
+	GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;
+	GPIO_Init(GPIOC, &GPIO_InitStructure);
+
+	// GPIO AF config
+	GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_I2C2);
+	GPIO_PinAFConfig(GPIOC, GPIO_PinSource12, GPIO_AF_I2C2);
+
+	// I2C config
+	I2C_DeInit(I2C2);
+	I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;
+	I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;
+	I2C_InitStructure.I2C_OwnAddress1 = 0x00;
+	I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;
+	I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;
+	I2C_InitStructure.I2C_ClockSpeed = 100000;
+	I2C_ITConfig(I2C2, I2C_IT_ERR, ENABLE);
+	I2C_Init(I2C2, &I2C_InitStructure);
+	I2C_Cmd(I2C2, ENABLE);
+/*
     GPIO_InitTypeDef GPIO_InitStructure;
 
 	//RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C2, ENABLE);
@@ -232,6 +279,7 @@ void I2C2_init() {
 	//I2C_ITConfig(I2C2, I2C_IT_ERR, ENABLE);
 	//I2C_Init(I2C2, &I2C_InitStructure);
 	//I2C_Cmd(I2C2, ENABLE);
+*/
 #endif
 }
 
@@ -239,7 +287,7 @@ void I2C2_init() {
 #define ERROR -1
 // Ошибка где то здесь
 
-#define I2C2_CMSIS 1
+#define I2C2_CMSIS 0
 #if I2C2_CMSIS
 int SCCB_write_reg(uint8_t reg_addr, uint8_t data) {
 #else
@@ -338,7 +386,7 @@ bool SCCB_write_reg(uint8_t reg_addr, uint8_t* data) {
 #endif
 }
 
-#define OV7670_INIT_CMSIS 1
+#define OV7670_INIT_CMSIS 0
 
 #if OV7670_INIT_CMSIS
 int OV7670_init() {
@@ -382,7 +430,7 @@ bool OV7670_init() {
 }
 //===========================================================================================================
 
-#if 0
+#if 1
 void DMA2_Stream1_IRQHandler(void) {
 	// DMA complete
 	if (DMA_GetITStatus(DMA2_Stream1, DMA_IT_TCIF1) != RESET) { // Transfer complete
@@ -414,7 +462,7 @@ void DCMI_IRQHandler(void) {
 }
 #endif
 
-#if 1
+#if 0
 void DMA2_Stream1_IRQHandler(void) {
 	if((DMA2->LISR & DMA_LISR_TCIF1) == DMA_LISR_TCIF1) {
 		DMA2->LIFCR |= DMA_LIFCR_CTCIF1;
@@ -438,7 +486,7 @@ void DCMI_IRQHandler(void) {
 #endif
 
 void DCMI_init() {
-#if 1
+#if 0
     /* GPIO */
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
@@ -538,6 +586,7 @@ void DCMI_init() {
  //   DCMI->IER |= (DCMI_IER_FRAME_IE | DCMI_IER_OVF_IE | DCMI_IER_ERR_IE);
    // NVIC_EnableIRQ(DCMI_IRQn);
   //  NVIC_SetPriority(DCMI_IRQn, 1);
+    RCC->AHB2ENR |= RCC_AHB2ENR_DCMIEN;
     DCMI->CR |= (DCMI_CR_CM | DCMI_CR_VSPOL | DCMI_CR_HSPOL | DCMI_CR_PCKPOL | DCMI_CR_ENABLE);
 #else
     GPIO_InitTypeDef GPIO_InitStructure;
@@ -545,11 +594,14 @@ void DCMI_init() {
 	DMA_InitTypeDef DMA_InitStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
 
-	RCC_AHB2PeriphClockCmd(RCC_AHB2Periph_DCMI, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
+	RCC->AHB1ENR |= (RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN | RCC_AHB1ENR_DMA2EN);
+    RCC->AHB2ENR |= RCC_AHB2ENR_DCMIEN;
+
+//	RCC_AHB2PeriphClockCmd(RCC_AHB2Periph_DCMI, ENABLE);
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
 
 	// GPIO config
 
@@ -648,10 +700,10 @@ void DCMI_init() {
 #endif
 }
 //===========================================================================================================
-#define GPIO_AF_MCO    0x00UL
+//#define GPIO_AF_MCO    0x00UL
 
 void MCO1_init() {
-#if 1
+#if 0
     //enable clock for GPIOA
     RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 	
@@ -667,8 +719,11 @@ void MCO1_init() {
 #else
     GPIO_InitTypeDef GPIO_InitStructure;
 
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+
+
 	RCC_ClockSecuritySystemCmd(ENABLE);
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+//	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
 	// GPIO config
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_8;		//PA8 - XCLK
