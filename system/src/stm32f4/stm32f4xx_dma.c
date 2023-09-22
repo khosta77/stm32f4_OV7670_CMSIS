@@ -116,6 +116,11 @@
 #include "../../include/stm32f4/stm32f4xx_dma.h"
 #include "../../include/stm32f4/stm32f4xx_rcc.h"
 
+static void assert_param(uint8_t c) {
+    c += 1;
+}
+
+
 /** @addtogroup STM32F4xx_StdPeriph_Driver
   * @{
   */

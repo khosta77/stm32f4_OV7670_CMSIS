@@ -69,6 +69,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "../../include/stm32f4/misc.h"
 
+static void assert_param(uint8_t c) {
+    c += 1;
+}
+
 /** @addtogroup STM32F4xx_StdPeriph_Driver
   * @{
   */
